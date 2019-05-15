@@ -1,0 +1,42 @@
+---
+title: "Installation"
+author: "Mikaël SWAWOLA"
+date: "14/05/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+La procédure d'installation de TensorFlow et Keras varie considérablement d'un système d'exploitation à l'autre et d'un type de matériel à l'autre. Nous utiliserons pour l'atelier des machines virtuelles avec GPU préinstallées.
+
+## Installation sur CPU
+
+En premier lieu, installez le paquet 'devtools'.
+
+Si l'installation échoue, assurez-vous d'avoir les libraries suivantes installées sur votre système d'exploitation:
+* zlib1g-dev libssl-dev (package on e.g. Debian and Ubuntu)
+* zlib-devel openssl-devel (package on e.g. Fedora, CentOS and RHEL)
+* openssl (Homebrew package on OS X)
+```{r}
+install.packages("devtools")
+```
+
+Ensuite, installez les paquets R TensorFlow et Keras (dans cet ordre) à partir des dépot Github
+```{r}
+devtools::install_github("rstudio/tensorflow")
+devtools::install_github("rstudio/keras")
+```
+
+L'interface Keras R utilise par défaut TensorFlow. Pour installer à la fois la bibliothèque Keras et TensorFlow, utilisez la fonction suivante:
+
+```{r}
+library(keras)
+install_keras()
+```
+
+## Test de l'installation
+```{r}
+is_keras_available()
+```

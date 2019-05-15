@@ -1,0 +1,160 @@
+---
+title: "Atelier #A - Survol de Tensorboard"
+author: "Mikaël SWAWOLA et Éric HAMEL"
+date: "14/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(TF_CPP_MIN_LOG_LEVEL = "3") # Car TensorFlow est extrèmement bavard...
+```
+
+```{r libraries}
+library(png)
+library(keras)
+library(tensorflow)
+use_implementation("tensorflow")
+```
+
+```{r}
+K <- backend()
+K$clear_session()
+```
+
+
+
+## 1. Visualiser l'entraînement et le graph
+
+```{r}
+fashion_mnist <- dataset_fashion_mnist()
+
+c(train_images, train_labels) %<-% fashion_mnist$train
+c(test_images, test_labels) %<-% fashion_mnist$test
+
+class_names <- c('T-shirt/top',
+                'Trouser',
+                'Pullover',
+                'Dress',
+                'Coat', 
+                'Sandal',
+                'Shirt',
+                'Sneaker',
+                'Bag',
+                'Ankle boot')
+
+train_images_norm <- train_images / 255
+test_images_norm <- test_images / 255
+```
+
+
+```{r}
+model <- keras_model_sequential() %>%
+  layer_flatten(input_shape = c(28, 28)) %>%
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dense(units = 10, activation = 'softmax')
+  
+model %>% compile(
+    optimizer = optimizer_adam(lr=0.001), 
+    loss = 'sparse_categorical_crossentropy',
+    metrics = c('accuracy')
+  )
+
+model %>% fit(train_images_norm, train_labels,
+    batch_size=32,
+    epochs=25,
+    callbacks = callback_tensorboard("logs/demo_1", write_images = TRUE, histogram_freq = 2),
+    validation_split = 0.1
+    )
+
+```
+
+
+
+## 2. Visualiser les projections du jeu de données
+
+Ce code, donné à titre indicatif, est pour le moment non fonctionnel en R. Pour la démo, les logs de Tensorboard correspondants ont été créés en Python.
+
+```{r}
+embedding_var <- tf$Variable(test_images, name='fmnist_embedding')
+summary_writer <- tf$summary$FileWriter('logs')
+
+config <- tf$contrib$tensorboard$plugins$projector$ProjectorConfig()
+config$model_checkpoint_path = "logs/demo_2/model.ckpt"
+embedding <- config$embeddings$add()
+embedding$tensor_name <- embedding_var$name
+
+embedding$metadata_path = 'logs/demo_2/metadata.tsv'
+
+embedding$sprite$image_path = 'logs/demo_2/sprite.png' # os.path.join(logdir, 'sprite.png')
+embedding$sprite$single_image_dim$extend(c(as.integer(28), as.integer(28)))
+
+tf$contrib$tensorboard$plugins$projector$visualize_embeddings(summary_writer,config)
+```
+
+```{r}
+sesh <- tf$Session()
+
+sesh$run(tf$global_variables_initializer())
+saver <- tf$train$Saver()
+saver$save(sess = sesh, save_path = "logs/demo_2/model.ckpt")
+sesh$close()
+```
+
+
+
+### Création de l'image des Sprites
+
+```{r}
+rows <- 28
+cols <- 28
+
+sprite_dim <- as.integer(sqrt(dim(test_images)[1]))
+sprite_image <- matrix(1, ncol = cols*sprite_dim, nrow = rows*sprite_dim)
+
+index <- 1
+labels <- c()
+for(i in 1:sprite_dim){
+  for(j in 1:sprite_dim){
+    
+    labels <- c(labels, class_names[test_labels[index]+1])
+    sprite_image[
+      as.integer((i-1) * cols+1): as.integer(i * cols),
+      as.integer((j-1) * rows + 1): as.integer(j * rows)
+    ] <- test_images[index,,] * - 1 + 1
+
+    index <- index + 1
+  }
+}
+
+rotate <- function(x) t(apply(x, 2, rev))#
+
+image <- rotate(sprite_image)
+
+writePNG(image, target = 'logs/demo_2/sprite.png')
+
+```
+
+
+
+### Création du fichier de metadata
+
+```{r}
+fileConn<-file("logs/demo_2/metadata.tsv")
+writeLines(paste(as.character(1:10000), as.character(test_labels), sep="\t"), fileConn)
+close(fileConn)
+```
+
+
+
+### Pour aller dans Tensorboard
+
+```{bash}
+tensorboard --logdir=logs/demo_2/
+```
+
+Ou bien:
+
+```{r}
+tensorboard( log_dir = "logs/demo_2/")
+```
